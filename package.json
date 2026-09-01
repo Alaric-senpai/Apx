@@ -10,5 +10,13 @@
   "devDependencies": {
     "turbo": "latest",
     "typescript": "^5.4.0"
-  }
+  },
+    "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.24.0",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@11.24.0"
 }

@@ -14,8 +14,8 @@ export const FRAMEWORK_CONFIGS: Record<FrameworkId, FrameworkConfig> = {
   nextjs: {
     scaffold: (n) => ({
       cmd: 'pnpm',
-      args: ['create', 'next-app', n, '--typescript',
-             '--no-git', '--no-turbopack', '--yes'],
+      args: ['create', 'next-app', n, '--ts', '--eslint',
+             '--no-git', '--tailwind' ,'--app', '--use-pnpm'],
     }),
     versionPkg: 'next',
   },

@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import type { Registry, FrameworkId, CachedVersion } from '@apx/types';
-
+import {logger} from '@apx/utils'
 export const APX_DIR       = path.join(os.homedir(), '.apx');
 export const REGISTRY_PATH = path.join(APX_DIR, 'registry.json');
 export const TEMPLATES_DIR = path.join(APX_DIR, 'templates');
@@ -14,10 +14,18 @@ const EMPTY_REGISTRY: Registry = {
   frameworks: {},
 };
 
+/**
+ * Method to ensure all needed directories exists
+ */
 export async function ensureApxDirs(): Promise<void> {
+
+  logger.info("DIRECTORY CHECK: ensuring all needed directories exist")
+
   await fs.ensureDir(APX_DIR);
   await fs.ensureDir(TEMPLATES_DIR);
   await fs.ensureDir(LOGS_DIR);
+
+  logger.success("SUCCESS: All necessary directories exist")
 }
 
 export async function readRegistry(): Promise<Registry> {

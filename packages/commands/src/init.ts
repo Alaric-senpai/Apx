@@ -1,110 +1,26 @@
-import path from 'path';
-import fs from 'fs-extra';
-import { execa } from 'execa';
-import inquirer from 'inquirer';
-import { isOnline, getLatestVersion, logger } from '@apx/utils';
+import { logger } from '@apx/utils';
 import {
-  getFrameworkEntry,
-  copyTemplateToProject,
-  downloadAndCacheTemplate,
-  FRAMEWORK_CONFIGS,
+  ensureApxDirs,
 } from '@apx/core';
-import type { FrameworkId, InitOptions } from '@apx/types';
+import { doctorCommand } from './doctor.js';
 
-export async function initCommand(
-  framework: FrameworkId,
-  projectName: string,
-  options: InitOptions = {}
-): Promise<void> {
-  const spinner = logger.spin('Reading cache...');
+export async function initCommand(): Promise<void> {
+  const spinner = logger.spin('Initializing APX...');
 
   try {
-    const entry = await getFrameworkEntry(framework);
+    await ensureApxDirs();
 
-    if (!entry || entry.cached.length === 0) {
-      spinner.fail(`No cached version found for ${framework}.`);
-      logger.info(`Run: apx setup ${framework}`);
-      return;
-    }
+    spinner.succeed('APX initialized successfully!');
+    logger.info('Running system checks...');
+    logger.dim('');
 
-    let targetVersion = options.version ?? entry.default;
+    await doctorCommand();
 
-    if (!options.offline) {
-      spinner.text = 'Checking for updates...';
-      const online = await isOnline();
-
-      if (online) {
-        const pkg = FRAMEWORK_CONFIGS[framework].versionPkg;
-        const latest = await getLatestVersion(pkg);
-
-        if (latest && latest !== targetVersion) {
-          spinner.stop();
-          logger.warn('Newer version available:');
-          logger.dim(`Cached : ${targetVersion}`);
-          logger.dim(`Latest : ${latest}`);
-
-          const { choice } = await inquirer.prompt([
-            {
-              type: 'list',
-              name: 'choice',
-              message: 'How would you like to proceed?',
-              choices: [
-                {
-                  name: `Use cached (${targetVersion}) — instant ⚡`,
-                  value: 'cached',
-                },
-                {
-                  name: `Download latest (${latest}) — requires internet`,
-                  value: 'latest',
-                },
-                { name: 'Cancel', value: 'cancel' },
-              ],
-            },
-          ]);
-
-          if (choice === 'cancel') {
-            logger.info('Cancelled.');
-            return;
-          }
-
-          if (choice === 'latest') {
-            const s = logger.spin(`Downloading ${framework}@${latest}...`);
-            await downloadAndCacheTemplate(framework, latest);
-            s.succeed(`${framework}@${latest} cached.`);
-            targetVersion = latest;
-          }
-        }
-      }
-    }
-
-    const projectPath = path.resolve(process.cwd(), projectName);
-
-    if (await fs.pathExists(projectPath)) {
-      spinner.fail(`Directory "${projectName}" already exists.`);
-      return;
-    }
-
-    const cachedEntry =
-      entry.cached.find(c => c.version === targetVersion) ??
-      entry.cached[entry.cached.length - 1];
-
-    spinner.text = 'Copying template...';
-    await copyTemplateToProject(
-      cachedEntry.templatePath,
-      projectPath,
-      projectName
-    );
-
-    spinner.text = 'Installing dependencies (offline)...';
-    await execa('pnpm', ['install', '--offline'], {
-      cwd: projectPath,
-      stdio: 'pipe',
-    });
-
-    spinner.succeed(
-      `${projectName} created with ${framework}@${cachedEntry.version}`
-    );
-    logger.dim(`cd ${projectName} && pnpm dev`);
+    logger.info('Next steps:');
+    logger.dim('  1. Run: apx setup nextjs');
+    logger.dim('  2. Run: apx create nextjs my-app');
+    logger.dim('');
+    logger.dim('Learn more: apx doctor');
   } catch (err) {
     spinner.fail(`Init failed: ${(err as Error).message}`);
     process.exit(1);

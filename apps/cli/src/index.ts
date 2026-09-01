@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import { Command } from 'commander';
+import { Command,  } from 'commander';
 import {
   setupCommand,
   initCommand,
   listCommand,
   doctorCommand,
+  createCommand
 } from '@apx/commands';
 import type { FrameworkId } from '@apx/types';
 
@@ -25,13 +26,21 @@ program
   );
 
 program
-  .command('init <framework> <project-name>')
+  .command('create <framework> <project-name>')
   .description('Create a new project from cached template')
   .option('-v, --version <version>', 'Cached version to use')
   .option('--offline', 'Skip update check, use cache only')
   .action((fw: string, name: string, opts) =>
-    initCommand(fw as FrameworkId, name, opts)
+    createCommand(fw as FrameworkId, name, opts)
   );
+
+program
+  .command("init")
+  .description("Perform first time apx setups")
+  .action(()=>{
+    initCommand()
+  })
+
 
 program
   .command('list')

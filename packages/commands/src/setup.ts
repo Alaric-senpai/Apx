@@ -5,6 +5,7 @@ import {
   FRAMEWORK_CONFIGS,
 } from '@apx/core';
 import type { FrameworkId, SetupOptions } from '@apx/types';
+import { execa } from 'execa';
 
 export async function setupCommand(
   framework: FrameworkId,
@@ -19,6 +20,17 @@ export async function setupCommand(
   const spinner = logger.spin(`Setting up ${framework}...`);
 
   try {
+    spinner.text = 'Checking prerequisites...';
+    
+    // Check if pnpm is available
+    try {
+      await execa('pnpm', ['--version']);
+    } catch {
+      spinner.fail('pnpm is not installed or not in PATH.');
+      logger.error('pnpm is required for APX. Install it with: npm i -g pnpm');
+      return;
+    }
+
     spinner.text = 'Checking internet...';
     const online = await isOnline();
 
@@ -42,7 +54,7 @@ export async function setupCommand(
       const entry = await getFrameworkEntry(framework);
       if (entry?.versions.includes(target)) {
         spinner.succeed(`${framework}@${target} already cached.`);
-        logger.dim(`Run: apx init ${framework} <project-name>`);
+        logger.dim(`Run: apx create ${framework} <project-name>`);
         return;
       }
     }
@@ -51,7 +63,7 @@ export async function setupCommand(
     await downloadAndCacheTemplate(framework, target);
 
     spinner.succeed(`${framework}@${target} cached successfully!`);
-    logger.dim(`Run: apx init ${framework} <project-name>`);
+    logger.dim(`Run: apx create ${framework} <project-name>`);
   } catch (err) {
     spinner.fail(`Setup failed: ${(err as Error).message}`);
     process.exit(1);
