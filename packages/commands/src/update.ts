@@ -2,7 +2,8 @@ import path from 'path';
 import fs from 'fs-extra';
 import { execa } from 'execa';
 import { isOnline, getLatestVersion, logger, ApxError } from '@apx/utils';
-import { getFrameworkEntry, FRAMEWORK_CONFIGS } from '@apx/core';
+import inquirer from 'inquirer';
+import { getFrameworkEntry, readRegistry, FRAMEWORK_CONFIGS } from '@apx/core';
 import type { FrameworkId, UpdateOptions } from '@apx/types';
 import { setupCommand } from './setup.js';
 
@@ -29,6 +30,32 @@ export async function updateCommand(
   const pkgPath = path.join(cwd, 'package.json');
 
   if (!(await fs.pathExists(pkgPath))) {
+    const registry = await readRegistry();
+    const cachedFws = Object.entries(registry.frameworks).filter(
+      ([_, d]) => d && d.cached && d.cached.length > 0
+    );
+
+    if (cachedFws.length > 0 && process.stdout.isTTY) {
+      const { selectedFw } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'selectedFw',
+          message: 'No project found in current directory. Choose a cached framework to update:',
+          choices: [
+            ...cachedFws.map(([id, d]) => ({
+              name: `${FRAMEWORK_CONFIGS[id as FrameworkId]?.displayName || id} (cached: v${d!.default})`,
+              value: id,
+            })),
+            { name: 'Cancel', value: 'cancel' },
+          ],
+        },
+      ]);
+
+      if (selectedFw && selectedFw !== 'cancel') {
+        return updateCommand(selectedFw, options);
+      }
+    }
+
     throw new ApxError(
       'UPDATE_ERROR',
       'No package.json found in current directory.',

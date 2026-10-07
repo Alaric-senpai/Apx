@@ -22,6 +22,10 @@ describe('apx cli interface', () => {
     const createCmd = program.commands.find((c) => c.name() === 'create');
 
     expect(createCmd).toBeDefined();
+    // Verify arguments are optional for peak interactivity
+    expect(createCmd!._args[0].required).toBe(false);
+    expect(createCmd!._args[1].required).toBe(false);
+
     const optionFlags = createCmd!.options.map((o) => o.flags);
     expect(optionFlags.some((f) => f.includes('--version'))).toBe(true);
     expect(optionFlags.some((f) => f.includes('--offline'))).toBe(true);
@@ -34,9 +38,13 @@ describe('apx cli interface', () => {
     const setupCmd = program.commands.find((c) => c.name() === 'setup');
 
     expect(setupCmd).toBeDefined();
+    // Verify framework argument is optional for peak interactivity
+    expect(setupCmd!._args[0].required).toBe(false);
+
     const optionFlags = setupCmd!.options.map((o) => o.flags);
     expect(optionFlags.some((f) => f.includes('--version'))).toBe(true);
     expect(optionFlags.some((f) => f.includes('--force'))).toBe(true);
+    expect(optionFlags.some((f) => f.includes('--yes'))).toBe(true);
     expect(optionFlags.some((f) => f.includes('--packages'))).toBe(true);
   });
 

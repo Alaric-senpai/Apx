@@ -67,4 +67,28 @@ describe('setup command', () => {
     expect(cached?.version).toBe('15.1.0');
     expect(await fs.pathExists(cached!.templatePath)).toBe(true);
   });
+
+  it('defaults to nextjs when framework is omitted with yes flag', async () => {
+    vi.spyOn(networkModule, 'isOnline').mockResolvedValue(true);
+    vi.spyOn(networkModule, 'getLatestVersion').mockResolvedValue('15.1.0');
+
+    vi.mocked(execaModule.execa).mockImplementation(async (cmd, args) => {
+      const folderArg = (args as string[] | undefined)?.find((a) => a.startsWith('apx-nextjs-'));
+      if (folderArg) {
+        const scaffoldDir = path.join(tempApxDir, 'temp', folderArg);
+        await fs.ensureDir(scaffoldDir);
+        await fs.writeJson(path.join(scaffoldDir, 'package.json'), {
+          name: 'scaffold-app',
+          dependencies: { next: '15.1.0' },
+        });
+        await fs.writeFile(path.join(scaffoldDir, 'pnpm-lock.yaml'), 'lock');
+      }
+      return { stdout: 'v9.0.0' } as any;
+    });
+
+    const cached = await setupCommand(undefined, { yes: true, version: '15.1.0' });
+
+    expect(cached).not.toBeNull();
+    expect(cached?.version).toBe('15.1.0');
+  });
 });

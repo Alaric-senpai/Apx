@@ -91,4 +91,32 @@ describe('create command', () => {
       code: 'PROJECT_EXISTS',
     });
   });
+
+  it('uses default project name <framework>-app if project name omitted with yes flag', async () => {
+    await registerVersion('nextjs', {
+      version: '15.0.0',
+      cachedAt: new Date().toISOString(),
+      templatePath: fakeTemplateDir,
+      packageManager: 'pnpm',
+      compatibility: { node: 'v20.0.0', os: ['linux'] },
+    });
+
+    const res = await createCommand('nextjs', undefined, {
+      offline: true,
+      yes: true,
+      skipInstall: true,
+    });
+
+    expect(res.projectPath).toBe(path.join(workDir, 'nextjs-app'));
+    const projectPkg = await fs.readJson(path.join(res.projectPath, 'package.json'));
+    expect(projectPkg.name).toBe('nextjs-app');
+  });
+
+  it('throws CACHE_EMPTY if framework omitted and no cached frameworks exist with yes flag', async () => {
+    await expect(
+      createCommand(undefined, 'my-app', { yes: true })
+    ).rejects.toMatchObject({
+      code: 'CACHE_EMPTY',
+    });
+  });
 });

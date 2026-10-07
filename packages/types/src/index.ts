@@ -44,6 +44,7 @@ export interface SetupOptions {
   version?: string;
   force?: boolean;
   packages?: string[];
+  yes?: boolean;
 }
 
 export interface CreateOptions {

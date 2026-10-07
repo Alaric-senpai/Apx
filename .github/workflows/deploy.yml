@@ -32,10 +32,10 @@ jobs:
         with:
           version: 11.24.0
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -60,10 +60,10 @@ jobs:
         with:
           version: 11.24.0
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -92,10 +92,10 @@ jobs:
         with:
           version: 11.24.0
 
-      - name: Setup Node.js 20 for publishing
+      - name: Setup Node.js 22 for publishing
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
