@@ -1,28 +1,27 @@
-import { logger } from '@apx/utils';
-import {
-  ensureApxDirs,
-} from '@apx/core';
+import { logger, ApxError } from '@apx/utils';
+import { ensureApxDirs, getApxDir } from '@apx/core';
 import { doctorCommand } from './doctor.js';
 
 export async function initCommand(): Promise<void> {
-  const spinner = logger.spin('Initializing APX...');
+  logger.banner();
+  const spinner = logger.spin('Initializing APX environment...');
 
   try {
     await ensureApxDirs();
+    spinner.succeed('APX local environment initialized!');
+    logger.dim(`Storage root: ${getApxDir()}`);
 
-    spinner.succeed('APX initialized successfully!');
-    logger.info('Running system checks...');
-    logger.dim('');
-
+    logger.info('Executing system diagnostic checks...');
     await doctorCommand();
 
-    logger.info('Next steps:');
-    logger.dim('  1. Run: apx setup nextjs');
-    logger.dim('  2. Run: apx create nextjs my-app');
-    logger.dim('');
-    logger.dim('Learn more: apx doctor');
+    logger.card('🚀 APX Ready for Offline Development', [
+      '1. Cache your preferred framework:  apx setup nextjs',
+      '2. Create an offline project:        apx create nextjs my-app',
+      '3. View cached framework inventory: apx list',
+      '4. Verify offline system health:     apx doctor',
+    ]);
   } catch (err) {
     spinner.fail(`Init failed: ${(err as Error).message}`);
-    process.exit(1);
+    throw new ApxError('TEMPLATE_ERROR', `Failed to initialize APX: ${(err as Error).message}`);
   }
 }

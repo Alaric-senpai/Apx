@@ -2,11 +2,32 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import type { Registry, FrameworkId, CachedVersion } from '@apx/types';
-import {logger} from '@apx/utils'
-export const APX_DIR       = path.join(os.homedir(), '.apx');
-export const REGISTRY_PATH = path.join(APX_DIR, 'registry.json');
-export const TEMPLATES_DIR = path.join(APX_DIR, 'templates');
-export const LOGS_DIR      = path.join(APX_DIR, 'logs');
+
+export function getApxDir(): string {
+  return process.env.APX_HOME || path.join(os.homedir(), '.apx');
+}
+
+export function getRegistryPath(): string {
+  return path.join(getApxDir(), 'registry.json');
+}
+
+export function getTemplatesDir(): string {
+  return path.join(getApxDir(), 'templates');
+}
+
+export function getLogsDir(): string {
+  return path.join(getApxDir(), 'logs');
+}
+
+export function getTempDir(): string {
+  return path.join(getApxDir(), 'temp');
+}
+
+export const APX_DIR = getApxDir();
+export const REGISTRY_PATH = getRegistryPath();
+export const TEMPLATES_DIR = getTemplatesDir();
+export const LOGS_DIR = getLogsDir();
+export const TEMP_DIR = getTempDir();
 
 const EMPTY_REGISTRY: Registry = {
   version: '1',
@@ -14,32 +35,41 @@ const EMPTY_REGISTRY: Registry = {
   frameworks: {},
 };
 
-/**
- * Method to ensure all needed directories exists
- */
 export async function ensureApxDirs(): Promise<void> {
+  const dir = getApxDir();
+  const templates = getTemplatesDir();
+  const logs = getLogsDir();
+  const temp = getTempDir();
 
-  logger.info("DIRECTORY CHECK: ensuring all needed directories exist")
-
-  await fs.ensureDir(APX_DIR);
-  await fs.ensureDir(TEMPLATES_DIR);
-  await fs.ensureDir(LOGS_DIR);
-
-  logger.success("SUCCESS: All necessary directories exist")
+  await fs.ensureDir(dir);
+  await fs.ensureDir(templates);
+  await fs.ensureDir(logs);
+  await fs.ensureDir(temp);
 }
 
 export async function readRegistry(): Promise<Registry> {
   await ensureApxDirs();
-  if (!(await fs.pathExists(REGISTRY_PATH))) {
-    await fs.writeJson(REGISTRY_PATH, EMPTY_REGISTRY, { spaces: 2 });
-    return structuredClone(EMPTY_REGISTRY);
+  const regPath = getRegistryPath();
+  if (!(await fs.pathExists(regPath))) {
+    const fresh = structuredClone(EMPTY_REGISTRY);
+    fresh.updatedAt = new Date().toISOString();
+    await fs.writeJson(regPath, fresh, { spaces: 2 });
+    return fresh;
   }
-  return fs.readJson(REGISTRY_PATH) as Promise<Registry>;
+  try {
+    return (await fs.readJson(regPath)) as Registry;
+  } catch {
+    const fresh = structuredClone(EMPTY_REGISTRY);
+    fresh.updatedAt = new Date().toISOString();
+    await fs.writeJson(regPath, fresh, { spaces: 2 });
+    return fresh;
+  }
 }
 
 export async function writeRegistry(reg: Registry): Promise<void> {
+  await ensureApxDirs();
   reg.updatedAt = new Date().toISOString();
-  await fs.writeJson(REGISTRY_PATH, reg, { spaces: 2 });
+  await fs.writeJson(getRegistryPath(), reg, { spaces: 2 });
 }
 
 export async function registerVersion(
@@ -60,9 +90,12 @@ export async function registerVersion(
       entry.versions.push(cached.version);
     }
     entry.default = cached.version;
-    const idx = entry.cached.findIndex(c => c.version === cached.version);
-    if (idx >= 0) entry.cached[idx] = cached;
-    else entry.cached.push(cached);
+    const idx = entry.cached.findIndex((c) => c.version === cached.version);
+    if (idx >= 0) {
+      entry.cached[idx] = cached;
+    } else {
+      entry.cached.push(cached);
+    }
   }
 
   await writeRegistry(reg);
@@ -71,4 +104,27 @@ export async function registerVersion(
 export async function getFrameworkEntry(framework: FrameworkId) {
   const reg = await readRegistry();
   return reg.frameworks[framework] ?? null;
+}
+
+export async function removeCachedVersion(
+  framework: FrameworkId,
+  version: string
+): Promise<boolean> {
+  const reg = await readRegistry();
+  const entry = reg.frameworks[framework];
+  if (!entry) return false;
+
+  entry.versions = entry.versions.filter((v) => v !== version);
+  entry.cached = entry.cached.filter((c) => c.version !== version);
+
+  if (entry.default === version) {
+    entry.default = entry.versions[entry.versions.length - 1] ?? '';
+  }
+
+  if (entry.versions.length === 0) {
+    delete reg.frameworks[framework];
+  }
+
+  await writeRegistry(reg);
+  return true;
 }

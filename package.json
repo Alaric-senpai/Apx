@@ -1,17 +1,24 @@
 {
   "name": "apx-monorepo",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "turbo lint",
     "clean": "turbo clean"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.3",
+    "tsup": "^8.5.1",
     "turbo": "latest",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^5.0.3"
   },
-    "devEngines": {
+  "devEngines": {
     "packageManager": {
       "name": "pnpm",
       "version": "11.24.0",

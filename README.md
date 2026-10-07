@@ -74,16 +74,30 @@ apx setup nextjs --force      # Re-download even if cached
 **Requires:** Internet connection
 
 ### `apx create <framework> <name>`
-Create a new project from cached template.
+Create a new project from cached template with interactive package selection.
 ```bash
-apx create nextjs my-app              # Use default cached version
-apx create nextjs my-app --version 13 # Use specific cached version
-apx create nextjs my-app --offline    # Force offline mode (no version check)
+apx create nextjs my-app                     # Interactive mode with package selector
+apx create nextjs my-app --packages zustand  # Specify packages directly
+apx create nextjs my-app --version 15        # Use specific cached version
+apx create nextjs my-app --offline           # Force offline mode (no update check)
+apx create nextjs my-app -y                  # Headless mode with defaults
 ```
-**Result:** Full Next.js project ready for development. Zero network calls after setup.
+**Result:** Ready-to-code project created in ~2 seconds using pnpm store hardlinks. Zero network calls after setup.
+
+### `apx update [framework]`
+Update an existing project or refresh cached templates.
+```bash
+# Inside an existing project folder:
+apx update                # Update project dependencies using npm latest
+apx update --offline      # Update dependencies using local offline cache
+apx update --dry-run      # Preview updates without writing changes
+
+# Globally:
+apx update nextjs         # Re-cache the latest Next.js template
+```
 
 ### `apx list`
-Show all cached frameworks and versions.
+Show all cached frameworks, versions, and hydrated addons.
 ```bash
 apx list
 ```
@@ -91,6 +105,7 @@ Displays:
 - Default version for each framework
 - All cached versions
 - Cache date
+- Hydrated addon packages
 
 ### `apx doctor`
 Run system diagnostics.
@@ -100,8 +115,8 @@ apx doctor
 Checks:
 - ✓ Node.js version
 - ✓ pnpm installation and version
-- ✓ APX directories
-- ✓ Registry integrity
+- ✓ APX storage directories
+- ✓ Local registry integrity
 - ✓ Internet connectivity
 
 ---
@@ -189,7 +204,7 @@ npm install -g apx
 
 From source (now):
 ```bash
-git clone https://github.com/yourusername/apx
+git clone https://github.com/Alaric-senpai/Apx
 cd apx
 pnpm install
 pnpm build
@@ -244,12 +259,19 @@ pnpm dev      # Watch mode for all packages
 
 ### Build
 ```bash
-pnpm build    # Compile all packages with Turbo
+pnpm build          # Compile all packages & bundle standalone CLI with tsup
 ```
 
-### Test Commands
+### Testing with Vitest
 ```bash
-# After build:
+pnpm test           # Run Vitest test suite across all workspace packages
+pnpm test:coverage  # Run test suite with V8 code coverage report
+pnpm test:watch     # Run Vitest in interactive watch mode
+```
+
+### Test CLI Binary
+```bash
+# Execute compiled standalone bundle:
 node apps/cli/dist/index.js --help
 node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js list
@@ -257,10 +279,11 @@ node apps/cli/dist/index.js list
 
 ### Monorepo Scripts
 ```bash
-pnpm dev       # Continuous compilation
-pnpm build     # Production build
-pnpm lint      # Linting (when added)
-pnpm clean     # Remove all dist/build artifacts
+pnpm dev            # Continuous development compilation
+pnpm build          # Production build across all packages
+pnpm test           # Execute Vitest test runner
+pnpm test:coverage  # Execute Vitest coverage report
+pnpm clean          # Remove all dist/build artifacts
 ```
 
 ---
@@ -288,15 +311,15 @@ Disk saved: 5 × 400MB = 2GB with deduplication
 ## 🌐 Offline Workflow Example
 
 ```bash
-# Day 1: At office with internet
+# Day 1:  with internet
 apx setup nextjs          # Download & cache
 
-# Day 2: On airplane, no internet
+# Day 2:  no internet
 apx create nextjs frontend    # ✈️ Works perfectly!
 apx create nextjs api         # ✈️ Works perfectly!
 apx create nextjs dashboard   # ✈️ Works perfectly!
 
-# Later: Back at office
+# Later: with internet
 pnpm -r dev               # Start all projects
 ```
 
@@ -323,6 +346,7 @@ MIT © APX Contributors
 ## 🚀 What's Next?
 
 - [x] Next.js MVP
+- [ ] Security check for installed frameworks 
 - [ ] Multi-framework support
 - [ ] Registry versioning improvements
 - [ ] Template customization

@@ -1,71 +1,103 @@
-import { isOnline, getLatestVersion, logger } from '@apx/utils';
+import { isOnline, getLatestVersion, logger, ApxError } from '@apx/utils';
 import {
   getFrameworkEntry,
   downloadAndCacheTemplate,
   FRAMEWORK_CONFIGS,
+  getFrameworkAddons,
 } from '@apx/core';
-import type { FrameworkId, SetupOptions } from '@apx/types';
+import type { FrameworkId, SetupOptions, CachedVersion } from '@apx/types';
 import { execa } from 'execa';
 
 export async function setupCommand(
   framework: FrameworkId,
   options: SetupOptions = {}
-): Promise<void> {
+): Promise<CachedVersion | null> {
   if (!(framework in FRAMEWORK_CONFIGS)) {
-    logger.error(`Unknown framework: ${framework}`);
-    logger.dim('Supported: nextjs, vite-react, nestjs, angular, expo');
-    return;
+    const supported = Object.keys(FRAMEWORK_CONFIGS).join(', ');
+    throw new ApxError(
+      'FRAMEWORK_NOT_FOUND',
+      `Unsupported framework "${framework}".`,
+      `Supported frameworks are: ${supported}`
+    );
   }
 
-  const spinner = logger.spin(`Setting up ${framework}...`);
+  logger.step(1, 3, 'Verifying environment prerequisites');
+  const spinner = logger.spin('Checking pnpm package manager...');
 
   try {
-    spinner.text = 'Checking prerequisites...';
-    
-    // Check if pnpm is available
-    try {
-      await execa('pnpm', ['--version']);
-    } catch {
-      spinner.fail('pnpm is not installed or not in PATH.');
-      logger.error('pnpm is required for APX. Install it with: npm i -g pnpm');
-      return;
+    await execa('pnpm', ['--version']);
+    spinner.succeed('pnpm detected in system PATH');
+  } catch {
+    spinner.fail('pnpm is not installed.');
+    throw new ApxError(
+      'PREREQUISITE_MISSING',
+      'pnpm is required for APX offline operations.',
+      'Install it globally: npm install -g pnpm'
+    );
+  }
+
+  const netSpinner = logger.spin('Verifying internet connectivity...');
+  const online = await isOnline();
+  if (!online) {
+    netSpinner.fail('Internet connection required for initial setup.');
+    throw new ApxError(
+      'NETWORK_REQUIRED',
+      'Cannot download framework templates without an active network connection.',
+      'Connect to the internet and re-run "apx setup ' + framework + '"'
+    );
+  }
+  netSpinner.succeed('Connected to registry.npmjs.org');
+
+  logger.step(2, 3, `Resolving ${FRAMEWORK_CONFIGS[framework].displayName} version`);
+  const versionSpinner = logger.spin('Resolving target version...');
+  const pkg = FRAMEWORK_CONFIGS[framework].versionPkg;
+  const latest = await getLatestVersion(pkg);
+
+  if (!latest && !options.version) {
+    versionSpinner.fail('Could not resolve latest version from npm registry.');
+    throw new ApxError(
+      'VERSION_NOT_FOUND',
+      `Unable to fetch the latest release version for package "${pkg}".`
+    );
+  }
+
+  const targetVersion = options.version ?? latest!;
+  versionSpinner.succeed(`Target version identified: ${targetVersion}`);
+
+  if (!options.force) {
+    const entry = await getFrameworkEntry(framework);
+    if (entry?.versions.includes(targetVersion)) {
+      logger.info(`${framework}@${targetVersion} is already cached locally.`);
+      logger.card('⚡ Framework Ready Offline', [
+        `Framework : ${framework}@${targetVersion}`,
+        `Action    : Run "apx create ${framework} <project-name>"`,
+        'Tip       : Use --force if you want to re-download the template',
+      ]);
+      return entry.cached.find((c) => c.version === targetVersion) ?? null;
     }
+  }
 
-    spinner.text = 'Checking internet...';
-    const online = await isOnline();
+  logger.step(3, 3, 'Scaffolding template & hydrating pnpm store');
+  const downloadSpinner = logger.spin(
+    `Downloading ${framework}@${targetVersion} & hydrating ~/.pnpm-store...`
+  );
 
-    if (!online) {
-      spinner.fail('No internet connection. Required for initial setup.');
-      return;
-    }
+  try {
+    const packagesToCache = options.packages ?? [];
 
-    spinner.text = 'Fetching latest version...';
-    const pkg = FRAMEWORK_CONFIGS[framework].versionPkg;
-    const latest = await getLatestVersion(pkg);
+    const cached = await downloadAndCacheTemplate(framework, targetVersion, packagesToCache);
+    downloadSpinner.succeed(`Successfully cached ${framework}@${targetVersion}!`);
 
-    if (!latest) {
-      spinner.fail('Could not resolve latest version.');
-      return;
-    }
+    logger.card('🎉 Offline Setup Complete', [
+      `Framework       : ${FRAMEWORK_CONFIGS[framework].displayName} (${targetVersion})`,
+      `Template Path   : ${cached.templatePath}`,
+      `Hydrated Store  : Dependencies cached in ~/.pnpm-store`,
+      `Instant Create  : apx create ${framework} my-app`,
+    ]);
 
-    const target = options.version ?? latest;
-
-    if (!options.force) {
-      const entry = await getFrameworkEntry(framework);
-      if (entry?.versions.includes(target)) {
-        spinner.succeed(`${framework}@${target} already cached.`);
-        logger.dim(`Run: apx create ${framework} <project-name>`);
-        return;
-      }
-    }
-
-    spinner.text = `Downloading ${framework}@${target}...`;
-    await downloadAndCacheTemplate(framework, target);
-
-    spinner.succeed(`${framework}@${target} cached successfully!`);
-    logger.dim(`Run: apx create ${framework} <project-name>`);
+    return cached;
   } catch (err) {
-    spinner.fail(`Setup failed: ${(err as Error).message}`);
-    process.exit(1);
+    downloadSpinner.fail(`Setup failed: ${(err as Error).message}`);
+    throw new ApxError('TEMPLATE_ERROR', `Failed to cache template: ${(err as Error).message}`);
   }
 }

@@ -1,0 +1,134 @@
+name: Publish to npmjs
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run publication (skip actual npm publish)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: deploy-apx
+  cancel-in-progress: false
+
+jobs:
+  verify-quality-gate:
+    name: Pre-deployment Test Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Run test suite
+        run: pnpm test
+
+  build-and-pack-verification:
+    name: Bundle & Package Inspection
+    needs: verify-quality-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production CLI bundle
+        run: pnpm --filter apx build
+
+      - name: Inspect and verify package tarball
+        working-directory: apps/cli
+        run: |
+          echo "Verifying package contents via npm pack dry-run..."
+          npm pack --dry-run
+          test -f dist/index.js || (echo "dist/index.js missing!" && exit 1)
+
+  publish-to-npmjs:
+    name: Publish to npmjs.org
+    needs: build-and-pack-verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+
+      - name: Setup Node.js 20 for publishing
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build standalone CLI distribution
+        run: pnpm --filter apx build
+
+      - name: Publish apx package to npmjs
+        if: ${{ !inputs.dry_run }}
+        working-directory: apps/cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          pnpm publish --no-git-checks --access public --provenance
+
+      - name: Dry Run Notice
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "Dry run enabled. Package verification succeeded, skipped publish."
+
+  create-github-release:
+    name: Create GitHub Release
+    needs: publish-to-npmjs
+    if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          draft: false
+          prerelease: false
